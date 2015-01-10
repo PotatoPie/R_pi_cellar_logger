@@ -40,18 +40,25 @@ DHT_TYPE = Adafruit_DHT.DHT22
 DHT_PIN  = 23
 
 # Google Docs account email, password, and spreadsheet name.
-GDOCS_EMAIL            = 'code.shamble@gmail.com'
-GDOCS_PASSWORD         = 'itispitime!'
-GDOCS_SPREADSHEET_NAME = 'Cellar surveillance'
+GDOCS_EMAIL            = 'INPUT REQUIRED'
+GDOCS_PASSWORD         = ''
+GDOCS_SPREADSHEET_NAME = ''
 
 # Set parameters
-time_bw_recordings = 5 # in minutes
+time_bw_recordings = 15 # in minutes
+strikes_bf_restart = 8 # consecutive fails before reboot triggers
 
+# Set local log file
+local_log = 'Data-log-file.txt'
 
 # Intialize basic counters, do basic things
 strikes = 0
-strikes_bf_restart = 5
 time_bw_recordings = time_bw_recordings * 60 # convert to seconds
+
+# Quick check
+if GDOCS_EMAIL == 'INPUT REQUIRED'
+	print('Program halted--Input email, password, spreadsheet names')
+	sys.exit()
 
 # function to get into spreadsheet
 def login_open_sheet(email, password, spreadsheet):
@@ -64,25 +71,27 @@ def login_open_sheet(email, password, spreadsheet):
 		print ('Login failed--waiting a few seconds to try again')
 		print (datetime.datetime.now)
 
-
-
-
 # Open spreadsheet
 worksheet = None
 while True:
 	# Login if necessary.
 	if worksheet is None:
 		worksheet = login_open_sheet(GDOCS_EMAIL, GDOCS_PASSWORD, GDOCS_SPREADSHEET_NAME)
-
+	
+	# Attempt data grab from sensor
 	humidity, temp = Adafruit_DHT.read(DHT_TYPE, DHT_PIN)
 	# if readings fails, wait a bit and retry
 	if humidity is None or temp is None:
 		time.sleep(2)
 		continue
 	
-	# Append the data in the spreadsheet, including a timestamp
+	# Append the data in the spreadsheet and to local log
 	try:
-		worksheet.append_row((datetime.datetime.now(), temp, humidity))
+		worksheet.append_row((datetime.datetime.now(), temp, humidity)) # to gDoc
+		dateToLog = strftime("%d %b %Y %H:%M:%S", localtime())
+		logFile_handle = open(local_log, "a")
+		logFile_handle.write(dateToLog + "\t" + str(temp) + "\t" + str(humidity) + "\n")
+		logFile_handle.close()
 		strikes = 0
 	except:
 		# Error appending data, most likely because credentials are stale.
@@ -97,7 +106,8 @@ while True:
 		time.sleep(2)
 		continue
 
-	# Wait 30 seconds before continuing
+	# Wait desired time before repeating
 	print ('Wrote a row to {0}'.format(GDOCS_SPREADSHEET_NAME))
+	print (dateToLog)
 	print(worksheet)
 	time.sleep(time_bw_recordings)
